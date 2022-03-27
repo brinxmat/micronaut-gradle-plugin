@@ -1,6 +1,11 @@
 package io.micronaut.gradle.docker;
 
+import com.bmuschko.gradle.docker.DockerRegistryCredentials;
+import com.bmuschko.gradle.docker.tasks.RegistryCredentialsAware;
 import com.bmuschko.gradle.docker.tasks.image.Dockerfile;
+import groovy.lang.MetaClass;
+import org.codehaus.groovy.runtime.InvokerHelper;
+import org.gradle.api.Action;
 import org.gradle.api.JavaVersion;
 import org.gradle.api.Project;
 import org.gradle.api.model.ObjectFactory;
@@ -9,7 +14,6 @@ import org.gradle.api.plugins.JavaApplication;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.internal.jvm.Jvm;
 
@@ -18,7 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-public class MicronautDockerfile extends Dockerfile implements DockerBuildOptions {
+public class MicronautDockerfile extends Dockerfile implements DockerBuildOptions, RegistryCredentialsAware {
     public static final String DEFAULT_WORKING_DIR = "/home/app";
 
     @Input
@@ -35,11 +39,15 @@ public class MicronautDockerfile extends Dockerfile implements DockerBuildOption
     @Input
     private final Property<String> targetWorkingDirectory;
 
+    private MetaClass metaClass;
+    private final DockerRegistryCredentials registryCredentials;
+
     public MicronautDockerfile() {
         Project project = getProject();
         setGroup(BasePlugin.BUILD_GROUP);
         setDescription("Builds a Docker File for a Micronaut application");
         ObjectFactory objects = project.getObjects();
+        registryCredentials = project.getObjects().newInstance(DockerRegistryCredentials.class, project.getObjects());
         this.buildStrategy = objects.property(DockerBuildStrategy.class)
                                     .convention(DockerBuildStrategy.DEFAULT);
         this.baseImage = objects.property(String.class).convention("none");
@@ -191,5 +199,28 @@ public class MicronautDockerfile extends Dockerfile implements DockerBuildOption
         task.copyFile("layers/classes", workDir + "/classes");
         task.copyFile("layers/resources", workDir + "/resources");
         task.copyFile("layers/application.jar", workDir + "/application.jar");
+    }
+
+    @Override
+    public MetaClass getMetaClass() {
+        if (metaClass == null) {
+            metaClass = InvokerHelper.getMetaClass(getClass());
+        }
+        return metaClass;    }
+
+    @Override
+    public void setMetaClass(MetaClass metaClass) {
+        this.metaClass = metaClass;
+    }
+
+    @Override
+    public DockerRegistryCredentials getRegistryCredentials() {
+
+        return this.registryCredentials;
+    }
+
+    @Override
+    public void registryCredentials(Action<? super DockerRegistryCredentials> action) {
+        action.execute(registryCredentials);
     }
 }
